@@ -1,4 +1,4 @@
-# eClass Scraper CLI
+# eClass Scraper (ECS)
 A command-line tool for scraping student data from the Athens University of Economics and Business (AUEB) eClass system.
 
 ## Features
