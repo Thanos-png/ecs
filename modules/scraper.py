@@ -15,7 +15,8 @@ class ClassScraper:
         self.login_url = "https://sso.aueb.gr/login?service=https%3A%2F%2Feclass.aueb.gr%2Fmodules%2Fauth%2Fcas.php"
         self.base_url = "https://eclass.aueb.gr"
         self.courses_url = f"{self.base_url}/main/my_courses.php"
-        self.output_file = "user-ids.txt"
+        self.course_code = "INF000"  # Default course code
+        self.output_file = f"user-ids-{self.course_code}.txt"
 
     def login(self):
         """Authenticate with the eClass system"""
@@ -90,7 +91,7 @@ class ClassScraper:
             return False
 
     def get_course_codes(self):
-        """Get the list of course codes from the user's courses page"""
+        """Get the list of course codes and names from the user's courses page"""
         try:
             response = self.session.get(self.courses_url)
             response.raise_for_status()
@@ -101,18 +102,24 @@ class ClassScraper:
         # Ensure the request was successful
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            course_codes = []
+            courses = []
 
             for td in soup.find_all('td'):
                 strong_tag = td.find('strong')
                 if strong_tag and strong_tag.find('a'):
-                    href = strong_tag.find('a')['href']
+                    link = strong_tag.find('a')
+                    href = link['href']
+
                     if '/courses/' in href:
                         course_code = href.split('/courses/')[1].strip('/')
-                        course_codes.append(course_code)
+                        course_name = link.text.strip()
+                        courses.append({
+                            'code': course_code,
+                            'name': course_name
+                        })
 
-            logging.info(f"Found {len(course_codes)} course codes")
-            return course_codes
+            logging.info(f"Found {len(courses)} course codes")
+            return courses
         else:
             logging.error(f"Failed to fetch course codes. Status code: {response.status_code}")
             return []
@@ -208,17 +215,47 @@ class ClassScraper:
         if not self.login():
             return False
 
-        course_codes = self.get_course_codes()
-        if not course_codes:
+        courses = self.get_course_codes()
+        if not courses:
             logging.error("No courses found")
             return False
 
-        # Use the first course for now
-        course_code = course_codes[0]
-        logging.info(f"Using course: {course_code}")
+        # Display course menu
+        print("\nAvailable courses:")
+        for i, course in enumerate(courses, 1):
+            print(f"{i}. [{course['code']}] {course['name']}")
 
-        user_list = self.get_user_list(course_code)
+        # Get user selection
+        while True:
+            try:
+                choice = input("\nSelect a course number (or 'q' to quit): ")
+
+                if choice.lower() == 'q':
+                    logging.info("User chose to quit.")
+                    return False
+
+                choice_index = int(choice) - 1
+                if 0 <= choice_index < len(courses):
+                    selected_course = courses[choice_index]
+                    self.course_code = selected_course['code']
+                    break
+                else:
+                    print(f"Invalid selection. Please enter a number between 1 and {len(courses)}.")
+            except ValueError:
+                print("Please enter a valid number or 'q' to quit.")
+
+        logging.info(f"Selected course: {self.course_code} ({courses[choice_index]['name']})")
+
+        # Update output file name with selected course code
+        self.output_file = f"user-ids-{self.course_code}.txt"
+
+        # Get users for selected course
+        user_list = self.get_user_list(self.course_code)
         logging.info(f"Retrieved {len(user_list)} users")
+
+        if not user_list:
+            logging.warning("No users found for this course.")
+            return False
 
         with open(self.output_file, "w", encoding="utf-8") as f:
             total = len(user_list) if user_list else 1
