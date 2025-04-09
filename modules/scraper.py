@@ -19,6 +19,13 @@ class ClassScraper:
     def login(self):
         """Authenticate with the eClass system"""
         logging.info("Logging in to eClass")
+
+        # First, get a valid session by visiting the base URL
+        try:
+            self.session.get(self.base_url)
+        except Exception as e:
+            logging.error(f"Error accessing base URL: {e}")
+
         payload = {
             "username": self.user.get_username(),
             "password": self.user.get_password(),
@@ -35,6 +42,9 @@ class ClassScraper:
             # Post to login URL
             response = self.session.post(self.login_url, data=payload, allow_redirects=True)
 
+            # Debug the response URL to see where I ended up
+            logging.info(f"Login redirected to: {response.url}")
+
             # Multiple ways to check for successful login
             if ("Αποσύνδεση" in response.text or 
                 "Έξοδος" in response.text or 
@@ -42,14 +52,34 @@ class ClassScraper:
                 logging.info("Login successful")
                 return True
 
-            # Try accessing the courses page - if we can access it, login was successful
+            # Try accessing the courses page, if we can access it, login was successful
             courses_response = self.session.get(self.courses_url)
             if courses_response.status_code == 200:
+                # Save a copy of the courses page for debugging if needed
+                with open("courses_debug.html", "w", encoding="utf-8") as f:
+                    f.write(courses_response.text)
+
                 # Look for indicators that we're logged in
-                if ("Τα μαθήματά μου" in courses_response.text or 
-                    "My Courses" in courses_response.text):
+                if ("Αποσύνδεση" in courses_response.text or 
+                "Έξοδος" in courses_response.text or 
+                "Logout" in courses_response.text or
+                "Τα μαθήματά μου" in courses_response.text or 
+                "My Courses" in courses_response.text):
                     logging.info("Login successful (verified via courses page)")
                     return True
+                
+            # If we can get course codes, we must be logged in
+            soup = BeautifulSoup(courses_response.text, 'html.parser')
+            course_links = soup.find_all('a', href=lambda href: href and '/courses/' in href)
+            
+            if course_links:
+                logging.info(f"Login successful (found {len(course_links)} course links)")
+                return True
+                
+            # If we don't see login form, we're probably logged in
+            if "password" not in courses_response.text.lower() and "username" not in courses_response.text.lower():
+                logging.info("Login appears successful (no login form found)")
+                return True
 
             logging.error("Login failed. Please check your credentials.")
             return False
@@ -88,13 +118,81 @@ class ClassScraper:
 
     def get_user_list(self, course_code):
         """Get the list of users for a specific course using the JSON endpoint"""
+        # First visit the course page to establish context
+        course_url = f"{self.base_url}/courses/{course_code}/"
+
+        try:
+            # Visit the course page first
+            course_resp = self.session.get(course_url)
+            if course_resp.status_code != 200:
+                logging.warning(f"Could not access course page for {course_code}: {course_resp.status_code}")
+        except Exception as e:
+            logging.warning(f"Error accessing course page: {e}")
+
+        # Try to get the user list
         json_url = f"{self.base_url}/modules/user/userslist.php?course={course_code}&sEcho=1&iColumns=2&sColumns=%2C&iDisplayStart=0&iDisplayLength=1000"
 
         try:
-            response = self.session.get(json_url)
-            response.raise_for_status()
-            return response.json().get("aaData", [])
-        except (requests.exceptions.RequestException, ValueError) as e:
+            headers = {
+                "X-Requested-With": "XMLHttpRequest",
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Referer": course_url
+            }
+
+            response = self.session.get(json_url, headers=headers)
+
+            # Debug information
+            if response.status_code != 200:
+                logging.error(f"User list request failed with status {response.status_code}")
+                return []
+
+            # Check if response is JSON
+            try:
+                data = response.json()
+                return data.get("aaData", [])
+            except ValueError:
+                # If not JSON, save response for debugging
+                with open("userslist_error.html", "w", encoding="utf-8") as f:
+                    f.write(response.text)
+                logging.error("Failed to parse JSON response from users list endpoint")
+
+                # Attempt to find an alternative way to get user data
+                logging.info("Trying alternative method to get users...")
+                try:
+                    # Try to get users from the participants page instead
+                    participants_url = f"{self.base_url}/modules/user/users.php?course={course_code}"
+                    part_resp = self.session.get(participants_url)
+
+                    if part_resp.status_code == 200:
+                        soup = BeautifulSoup(part_resp.text, 'html.parser')
+                        users = []
+
+                        user_rows = soup.select("table.table-default tr")
+                        for row in user_rows[1:]:  # Skip header row
+                            try:
+                                cells = row.find_all('td')
+                                if len(cells) >= 2:
+                                    user_link = cells[0].find('a')
+                                    if user_link:
+                                        user_name = user_link.text.strip()
+                                        href = user_link.get('href', '')
+                                        # Extract user ID from href
+                                        user_id = href.split('uid=')[-1] if 'uid=' in href else 'unknown'
+
+                                        users.append({
+                                            "0": f"<a href='{href}'>{user_name}</a>",
+                                            "DT_RowId": user_id
+                                        })
+                            except Exception as e:
+                                logging.warning(f"Error parsing user row: {e}")
+
+                        logging.info(f"Found {len(users)} users using alternative method")
+                        return users
+                except Exception as e:
+                    logging.error(f"Alternative method failed too: {e}")
+
+                return []
+        except requests.exceptions.RequestException as e:
             logging.error(f"Error fetching user list for course {course_code}: {e}")
             return []
 
@@ -116,26 +214,31 @@ class ClassScraper:
         logging.info(f"Retrieved {len(user_list)} users")
 
         with open(self.output_file, "w", encoding="utf-8") as f:
-            progress_bar(0, len(user_list))
+            total = len(user_list) if user_list else 1
+            progress_bar(0, total)
 
             for i, user in enumerate(user_list):
-                progress_bar(i + 1, len(user_list))
-
                 try:
                     # Parse user data
                     user_data = self.parse_user(user)
 
                     # Write to file
-                    f.write("+" + "―" * 85 + "+\n")
+                    f.write("+" + "―" * 55 + "+\n")
                     f.write(self.format_user_info(user_data))
+
+                    # Update progress bar
+                    progress_bar(i + 1, total)
 
                     # Add a small delay to avoid overloading the server
                     time.sleep(0.2)
                 except Exception as e:
                     logging.warning(f"Error processing user {i+1}: {e}")
+                    # Update progress bar even on error
+                    progress_bar(i + 1, total)
                     continue
 
-            f.write("+" + "―" * 85 + "+\n")
+            f.write("+" + "―" * 55 + "+\n")
+            print()  # Add a newline after progress bar completes
             logging.info(f"User data written to {self.output_file}")
 
         return True
@@ -245,6 +348,6 @@ class ClassScraper:
 
         formatted = ""
         for line in lines:
-            spaces = abs(len(line) - 60)
+            spaces = abs(len(line) - 56)
             formatted += line + " " * spaces + "|\n"
         return formatted

@@ -18,11 +18,7 @@ def main():
 
         # Scrape users from the eclass.aueb.gr website
         scraper = ClassScraper(credentials)
-        scraper.login()
-        course_codes = scraper.get_course_codes()
-        if not course_codes:
-            print("No courses found. Exiting.")
-            return
+        scraper.scrape_users()
 
     # Search for a specific user
     if args.search is not None:
@@ -37,9 +33,9 @@ def main():
 
     elif not args.scrape:
         show_search_header()
-        am_anaz = input("Student ID: ")
-        if am_anaz == "":
-            name_anaz = input("Full Name: ")
+        am = input("Student ID: ")
+        if am == "":
+            name = input("Full Name: ")
 
 if __name__ == "__main__":
     main()

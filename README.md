@@ -4,7 +4,7 @@ A command-line tool for scraping student data from the Athens University of Econ
 ## Features
 * Login securely with your credentials
 * Fetch and save student data to a file
-* Optional search by student ID or name
+* Optional search by student ID or name (coming soon)
 * CLI-friendly with argument parsing
 
 ## Requirements
