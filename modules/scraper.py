@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import datetime
 import logging
 import time
+import re
 from modules.utils import progress_bar
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s - %(message)s')
@@ -56,8 +57,8 @@ class ClassScraper:
             courses_response = self.session.get(self.courses_url)
             if courses_response.status_code == 200:
                 # Save a copy of the courses page for debugging if needed
-                with open("courses_debug.html", "w", encoding="utf-8") as f:
-                    f.write(courses_response.text)
+                # with open("courses_debug.html", "w", encoding="utf-8") as f:
+                #     f.write(courses_response.text)
 
                 # Look for indicators that we're logged in
                 if ("Αποσύνδεση" in courses_response.text or 
@@ -172,16 +173,22 @@ class ClassScraper:
                             try:
                                 cells = row.find_all('td')
                                 if len(cells) >= 2:
+                                    # First cell contains name
                                     user_link = cells[0].find('a')
+
+                                    # Second cell contains position
+                                    position = cells[1].text.strip() if len(cells) > 1 else "N/A"
+
                                     if user_link:
                                         user_name = user_link.text.strip()
                                         href = user_link.get('href', '')
-                                        # Extract user ID from href
-                                        user_id = href.split('uid=')[-1] if 'uid=' in href else 'unknown'
+                                        # Extract DB ID from href
+                                        db_id = href.split('uid=')[-1] if 'uid=' in href else 'unknown'
 
                                         users.append({
                                             "0": f"<a href='{href}'>{user_name}</a>",
-                                            "DT_RowId": user_id
+                                            "1": position,
+                                            "DT_RowId": db_id
                                         })
                             except Exception as e:
                                 logging.warning(f"Error parsing user row: {e}")
@@ -223,7 +230,7 @@ class ClassScraper:
                     user_data = self.parse_user(user)
 
                     # Write to file
-                    f.write("+" + "―" * 55 + "+\n")
+                    f.write("+" + "―" * 69 + "+\n")
                     f.write(self.format_user_info(user_data))
 
                     # Update progress bar
@@ -237,7 +244,7 @@ class ClassScraper:
                     progress_bar(i + 1, total)
                     continue
 
-            f.write("+" + "―" * 55 + "+\n")
+            f.write("+" + "―" * 69 + "+\n")
             print()  # Add a newline after progress bar completes
             logging.info(f"User data written to {self.output_file}")
 
@@ -247,12 +254,15 @@ class ClassScraper:
         """Extract user information from user data"""
         try:
             name = user["0"].split(">")[-2][:-3]
-            user_id = user["DT_RowId"]
+            position = user["1"][7:-8]
+            db_id = user["DT_RowId"]
 
             # Extract link more safely
             link_parts = user["0"].split("href='/")
             if len(link_parts) > 1:
                 link_part = link_parts[1].split("'>")[0]
+                link_part = link_part.split("&amp;")
+                link_part = link_part[0] + "&" + link_part[1]
                 # Remove the potentially problematic substring manipulation
                 link = f"{self.base_url}/{link_part}"
             else:
@@ -262,92 +272,101 @@ class ClassScraper:
             response = self.session.get(link)
             soup = BeautifulSoup(response.text, "html.parser")
 
-            # Extract AM (student ID)
-            am_div = soup.find("div", class_="not_visible")
-            am = am_div.text if am_div else "N/A"
+            # Extract User ID (student ID)
+            user_id_div = soup.find("div", class_="not_visible")
+            user_id = user_id_div.text if user_id_div else "N/A"
 
             # Extract profile data
             profile_div = soup.find("div", class_="profile-content-panel-text")
             if not profile_div:
                 raise ValueError("Profile data not found")
 
-            infoList = profile_div.text.replace(" ", "").replace("\n", "").split(":")
-            phone, position, department, year = self.parse_profile(infoList)
+            # Initialize values
+            phone = ""
+            email = ""
+            department = "N/A"
+            date = "N/A"
+            years = "N/A"
+
+            # Each piece of information is in its own div with a span for the label
+            for div in profile_div.find_all("div", style="line-height:26px;"):
+                span = div.find("span")
+                if not span:
+                    continue
+
+                label = span.text.strip()
+                # Get the text content after the span (the value)
+                value = div.get_text().replace(span.get_text(), "", 1).strip()
+
+                if "Τηλέφωνο:" in label:  # Phone
+                    phone = value
+
+                elif "E-mail:" in label:  # Email
+                    # Handle the email that might be in a script
+                    email_link = div.find("a")
+                    if email_link:
+                        email = email_link.text.strip()
+                    else:
+                        email = value if value and value != "(e-mail address hidden)" else ""
+
+                elif "Κατηγορία:" in label:  # Department
+                    department = value
+
+                elif "Μέλος από:" in label:  # Registration date
+                    date = value
+                    # Extract just the year (4 digits)
+                    year_match = re.search(r'(\d{4})', value)
+                    if year_match:
+                        years = year_match.group(1)
 
             # Calculate year
             current_year = datetime.date.today().year
             current_month = datetime.date.today().month
             try:
-                year = current_year - int(year) + (1 if current_month >= 9 else 0)
+                years = current_year - int(years) + (1 if current_month >= 9 else 0)
             except (ValueError, TypeError):
-                year = "N/A"
+                years = "N/A"
 
             return {
                 "name": name,
-                "am": am,
                 "user_id": user_id,
                 "position": position,
+                "email": email,
+                "phone": phone,
                 "department": department,
-                "year": year,
-                "phone": phone
+                "date": date,
+                "years": years,
+                "db_id": db_id
             }
         except Exception as e:
             logging.warning(f"Error parsing user: {e}")
             raise
 
-    def parse_profile(self, infoList):
-        """Parse profile information with better error handling"""
-        phone = ""
-        position = "N/A"
-        department = "N/A"
-        year = "N/A"
-
-        try:
-            if len(infoList) == 6:
-                position = infoList[1][:-9]
-                department = infoList[2][:-8]
-                year = infoList[3][6:10]
-            elif len(infoList) == 7:
-                position = infoList[2][:-9]
-                department = infoList[3][:-8]
-                year = infoList[4][6:10]
-            elif len(infoList) == 8:
-                phone = infoList[2][:-8]
-                position = infoList[3][:-9]
-                department = infoList[4][:-8]
-                year = infoList[5][6:10]
-            elif len(infoList) == 9:
-                phone = infoList[2][:-8]
-                position = infoList[3][:-14]
-                department = infoList[5][:-8]
-                year = infoList[6][6:10]
-            else:
-                phone = "<More Info>"
-                logging.warning(f"Unexpected profile format with {len(infoList)} elements")
-        except IndexError:
-            logging.warning("Index error when parsing profile data")
-
-        return phone, position, department, year
-
     def format_user_info(self, user_data):
         """Format user information for output file"""
         lines = [
             f"| Full Name: {user_data.get('name', 'N/A')}",
-            f"| Student ID: {user_data.get('am', 'N/A')}",
+            f"| Student-ID: {user_data.get('user_id', 'N/A')}",
+            f"| Position: {user_data.get('position', 'N/A')}"
         ]
 
-        if user_data.get('til'):
-            lines.append(f"| Phonenumber: {user_data.get('phone')}")
+        # Add email if available
+        if user_data.get('email'):
+            lines.append(f"| Email: {user_data.get('email')}")
+
+        # Add phone number if available
+        if user_data.get('phone'):
+            lines.append(f"| Phone Number: {user_data.get('phone')}")
 
         lines.extend([
-            f"| Position: {user_data.get('position', 'N/A')}",
             f"| Department: {user_data.get('department', 'N/A')}",
-            f"| Year: {user_data.get('year', 'N/A')}",
-            f"| DB ID: {user_data.get('user_id', 'N/A')}"
+            f"| Registration Date: {user_data.get('date', 'N/A')}",
+            f"| Years: {user_data.get('years', 'N/A')}",
+            f"| DB-ID: {user_data.get('db_id', 'N/A')}"
         ])
 
         formatted = ""
         for line in lines:
-            spaces = abs(len(line) - 56)
+            spaces = abs(len(line) - 70)
             formatted += line + " " * spaces + "|\n"
         return formatted
