@@ -52,7 +52,7 @@ def main():
         show_search_header()
 
         # Validate and format the Student ID if needed
-        search_id = get_valid_student_id(args.search)
+        search_id = get_valid_student_id(args.search.strip())
 
         print(f"Searching for student ID: {search_id}")
         # Logic to search data by Student ID
@@ -60,8 +60,14 @@ def main():
     elif args.name is not None:
         show_search_header()
 
+        # Remove the Greek accents from the name
+        search_name = args.name.strip()
+
         # Format the name
-        search_name = args.name.upper()
+        search_name = search_name.upper()
+
+        # Remove any extra spaces
+        search_name = " ".join(search_name.split())
 
         print(f"Searching for student name: {search_name}")
         # Logic to search data by Name
@@ -73,7 +79,15 @@ def main():
         search_id = get_valid_student_id()
 
         if search_id is None:
-            search_name = input("Full Name: ").upper()
+            # Remove the Greek accents from the name
+            search_name = input("Full Name: ").strip()
+
+            # Format the name
+            search_name = search_name.upper()
+
+            # Remove any extra spaces
+            search_name = " ".join(search_name.split())
+
             print(f"Searching for student name: {search_name}")
             # Logic to search data by Name
         else:

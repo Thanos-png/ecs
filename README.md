@@ -33,16 +33,16 @@ Your credentials are securely requested on runtime via terminal prompts. No hard
 ```
 ecs --scrape
 ```
-This will log into the system, fetch user data, and save it to ```user-ids.txt```.
+This will log into the system, fetch user data, and save it to ```user-ids-{course code}.txt```.
 
-### Search by Student ID:
+### Search by Student ID (coming soon):
 ```
-ecs --search 123456
+ecs --search 1234567
 ```
 
-### Search by Full Name:
+### Search by Full Name (coming soon):
 ```
-ecs --name "Thanos Panagiotidis"
+ecs --name "Αθανάσιος Παναγιωτίδης"
 ```
 
 ## Contributing
