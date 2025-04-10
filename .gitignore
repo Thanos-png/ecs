@@ -1,2 +1,25 @@
-user-ids*.txt
-courses_debug.html
+# Python cache files
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+
+# User data files
+ecs/user-ids*.txt
+ecs/courses_debug.html
+
+# Virtual environment
+venv/
+ecs/venv/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Byte-compiled / optimized / DLL files
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.so
+.Python

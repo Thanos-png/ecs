@@ -15,14 +15,14 @@ A command-line tool for scraping student data from the Athens University of Econ
 1. Clone the repository:
 
 ```
-git clone https://github.com/yourusername/ECS.git
-cd ECS
+git clone https://github.com/Thanos-png/ecs.git
+cd ecs
 ```
 
-2. Install dependencies:
+2. Install the CLI tool:
 
 ```
-pip install -r requirements.txt
+pip install .
 ```
 
 ## Credentials
@@ -31,18 +31,18 @@ Your credentials are securely requested on runtime via terminal prompts. No hard
 ## Usage
 ### Scrape Users:
 ```
-python main.py --scrape
+ecs --scrape
 ```
 This will log into the system, fetch user data, and save it to ```user-ids.txt```.
 
 ### Search by Student ID:
 ```
-python main.py --search 123456
+ecs --search 123456
 ```
 
 ### Search by Full Name:
 ```
-python main.py --name "Thanos Panagiotidis"
+ecs --name "Thanos Panagiotidis"
 ```
 
 ## Contributing

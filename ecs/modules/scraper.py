@@ -4,7 +4,7 @@ import datetime
 import logging
 import time
 import re
-from modules.utils import progress_bar
+from ecs.modules.utils import progress_bar
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s - %(message)s')
 
