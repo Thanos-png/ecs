@@ -7,21 +7,21 @@ A command-line tool for scraping student data from the Athens University of Econ
 * Optional search by student ID or name (coming soon)
 * CLI-friendly with argument parsing
 
-## Requirements
+## Quick Start
+
+### Prerequisites
 * requests
 * beautifulsoup4
 
-## Installation
+### Installation
 1. Clone the repository:
-
-```
+```bash
 git clone https://github.com/Thanos-png/ecs.git
 cd ecs
 ```
 
-2. Install the CLI tool:
-
-```
+2. Install the scraper tool:
+```bash
 pip install .
 ```
 
