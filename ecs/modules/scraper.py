@@ -4,9 +4,14 @@ import datetime
 import logging
 import time
 import re
+import os
 from ecs.modules.utils import progress_bar
+from ecs.modules.Student import Student
+from ecs.modules.StudentDatabase import StudentDatabase
+
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s - %(message)s')
+
 
 class ClassScraper:
     def __init__(self, user_instance):
@@ -15,8 +20,16 @@ class ClassScraper:
         self.login_url = "https://sso.aueb.gr/login?service=https%3A%2F%2Feclass.aueb.gr%2Fmodules%2Fauth%2Fcas.php"
         self.base_url = "https://eclass.aueb.gr"
         self.courses_url = f"{self.base_url}/main/my_courses.php"
-        self.course_code = "INF000"  # Default course code
+        self.course_code = "INF001"  # Default course code
+
+        # Create data directory if it doesn't exist
+        self.data_dir = "data"
+        if not os.path.exists(self.data_dir):
+            os.makedirs(self.data_dir)
+            print(f"Created data directory: {self.data_dir}")
+
         self.output_file = f"user-ids-{self.course_code}.txt"
+        self.student_db = StudentDatabase()  # Initialize database with course-specific file
 
     def login(self):
         """Authenticate with the eClass system"""
@@ -247,7 +260,30 @@ class ClassScraper:
         logging.info(f"Selected course: {self.course_code} ({courses[choice_index]['name']})")
 
         # Update output file name with selected course code
-        self.output_file = f"user-ids-{self.course_code}.txt"
+        self.output_file = os.path.join(self.data_dir, f"user-ids-{self.course_code}.txt")
+        db_file = os.path.join(self.data_dir, f"students_{self.course_code}.json")
+
+        # Check if database file exists and ask user preference
+        if os.path.exists(db_file):
+            # Load existing database to check size
+            temp_db = StudentDatabase(db_file)
+            if temp_db.size() > 0:
+                print(f"\nFound existing database with {temp_db.size()} students.")
+                update_choice = input("Do you want to (u)pdate existing data or start (f)resh? [u/f]: ").lower()
+                if update_choice == 'f':
+                    print("Starting with fresh database...")
+                    # Create new empty database
+                    self.student_db = StudentDatabase(db_file, auto_load=False)
+                else:
+                    print("Updating existing database...")
+                    self.student_db = temp_db
+            else:
+                # Empty database file exists
+                self.student_db = StudentDatabase(db_file, auto_load=False)
+        else:
+            # No database file exists
+            print("Creating new database...")
+            self.student_db = StudentDatabase(db_file, auto_load=False)
 
         # Get users for selected course
         user_list = self.get_user_list(self.course_code)
@@ -256,6 +292,10 @@ class ClassScraper:
         if not user_list:
             logging.warning("No users found for this course.")
             return False
+
+        print(f"Processing {len(user_list)} users...")
+        students_added = 0
+        students_failed = 0
 
         with open(self.output_file, "w", encoding="utf-8") as f:
             total = len(user_list) if user_list else 1
@@ -266,9 +306,36 @@ class ClassScraper:
                     # Parse user data
                     user_data = self.parse_user(user)
 
+                    # Create Student object and add to database
+                    if user_data and user_data.get('name'):
+                        student = Student(
+                            name=user_data.get('name', 'N/A'),
+                            user_id=user_data.get('user_id', 'N/A'),
+                            position=user_data.get('position', 'N/A'),
+                            email=user_data.get('email', 'N/A'),
+                            phone=user_data.get('phone', 'N/A'),
+                            department=user_data.get('department', 'N/A'),
+                            date=user_data.get('date', 'N/A'),
+                            years=user_data.get('years', 'N/A'),
+                            db_id=user_data.get('db_id', 'N/A')
+                        )
+
+                        # Add to database
+                        success = self.student_db.add_student(student)
+                        if success:
+                            students_added += 1
+                        else:
+                            students_failed += 1
+                            logging.warning(f"Failed to add student {user_data.get('name', 'Unknown')} to database")
+                            continue
+                    else:
+                        students_failed += 1
+                        logging.warning(f"User data for user {i+1} is incomplete or missing name: {user_data}")
+
                     # Write to file
-                    f.write("+" + "―" * 69 + "+\n")
-                    f.write(self.format_user_info(user_data))
+                    if user_data:
+                        f.write("+" + "―" * 69 + "+\n")
+                        f.write(self.format_user_info(user_data))
 
                     # Update progress bar
                     progress_bar(i + 1, total)
@@ -276,16 +343,59 @@ class ClassScraper:
                     # Add a small delay to avoid overloading the server
                     time.sleep(0.2)
                 except Exception as e:
+                    students_failed += 1
                     logging.warning(f"Error processing user {i+1}: {e}")
+                    import traceback
+                    traceback.print_exc()
                     # Update progress bar even on error
                     progress_bar(i + 1, total)
                     continue
 
             f.write("+" + "―" * 69 + "+\n")
             print()  # Add a newline after progress bar completes
+
+            # Print summary
+            print(f"\n===== SCRAPING SUMMARY =====")
+            print(f"Total users processed: {len(user_list)}")
+            print(f"Students added to database: {students_added}")
+            print(f"Failed/skipped: {students_failed}")
+            print(f"Database size: {self.student_db.size()}")
+            print(f"Files saved in: {os.path.abspath(self.data_dir)}/")
+            print(f"  - JSON database: {os.path.basename(db_file)}")
+            print(f"  - Text file: {os.path.basename(self.output_file)}")
+
             logging.info(f"User data written to {self.output_file}")
 
+            print(f"Students processed: {students_added}")
+            print(f"Database size: {self.student_db.size()}")
+
+            # Save database to file
+            if self.student_db.size() > 0:
+                success = self.student_db.save_to_file()
+                if success:
+                    logging.info(f"Database saved with {self.student_db.size()} students")
+                else:
+                    logging.error("Failed to save database")
+            else:
+                logging.warning("No students to save to database")
+
         return True
+
+    def search_student_by_id(self, user_id):
+        """Search for a student by user ID"""
+        return self.student_db.find_by_user_id(user_id)
+
+    def search_student_by_name(self, name):
+        """Search for students by name"""
+        return self.student_db.find_by_name(name)
+
+    def search_partial_name(self, partial_name):
+        """Search for students with partial name match"""
+        return self.student_db.search_partial_name(partial_name)
+
+    def get_database_info(self):
+        """Get information about the current database"""
+        return self.student_db.get_database_info()
 
     def parse_user(self, user):
         """Extract user information from user data"""
@@ -360,7 +470,7 @@ class ClassScraper:
             current_year = datetime.date.today().year
             current_month = datetime.date.today().month
             try:
-                years = current_year - int(years) + (1 if current_month >= 9 else 0)
+                years = str(current_year - int(years) + (1 if current_month >= 9 else 0))
             except (ValueError, TypeError):
                 years = "N/A"
 

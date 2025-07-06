@@ -4,24 +4,25 @@ A command-line tool for scraping student data from the Athens University of Econ
 ## Features
 * Login securely with your credentials
 * Fetch and save student data to a file
-* Optional search by student ID or name (coming soon)
+* Search by student ID or name with O(1) performance
+* Support for multiple course databases
 * CLI-friendly with argument parsing
 
-## Requirements
+## Quick Start
+
+### Prerequisites
 * requests
 * beautifulsoup4
 
-## Installation
+### Installation
 1. Clone the repository:
-
-```
+```bash
 git clone https://github.com/Thanos-png/ecs.git
 cd ecs
 ```
 
-2. Install the CLI tool:
-
-```
+2. Install the scraper tool:
+```bash
 pip install .
 ```
 
@@ -33,16 +34,28 @@ Your credentials are securely requested on runtime via terminal prompts. No hard
 ```
 ecs --scrape
 ```
-This will log into the system, fetch user data, and save it to ```user-ids-{course code}.txt```.
+This will log into the system, fetch user data, and save it to ```data/user-ids-{course code}.txt```.
 
-### Search by Student ID (coming soon):
+### Search by Student ID:
 ```
 ecs --search 1234567
 ```
 
-### Search by Full Name (coming soon):
+### Search by Full Name:
 ```
 ecs --name "Αθανάσιος Παναγιωτίδης"
+```
+
+## Common Errors
+#### Code changes not reflected when testing
+**Problem:** After modifying the source code, running `ecs` commands still uses the old version.
+
+**Cause:** The package was installed in standard mode, which creates a cached/compiled version that doesn't update when you change the source.
+
+**Solution:** Install in development mode for live code updates:
+```bash
+pip uninstall eClass-Scraper
+pip install -e .
 ```
 
 ## Contributing

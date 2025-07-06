@@ -4,7 +4,8 @@ __pycache__/
 */*/__pycache__/
 
 # User data files
-user-ids*.txt
+data/user-ids*.txt
+data/students_*.json
 courses_debug.html
 ecs/user-ids*.txt
 ecs/courses_debug.html

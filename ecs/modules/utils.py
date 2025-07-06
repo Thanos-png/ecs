@@ -1,4 +1,27 @@
 
+def remove_greek_accents(text: str) -> str:
+    """
+    Remove Greek accents from text.
+    """
+    # Greek accent mappings
+    accent_map = {
+        # Lowercase with tonos
+        'ά': 'α', 'έ': 'ε', 'ή': 'η', 'ί': 'ι', 'ό': 'ο', 'ύ': 'υ', 'ώ': 'ω',
+        # Uppercase with tonos
+        'Ά': 'Α', 'Έ': 'Ε', 'Ή': 'Η', 'Ί': 'Ι', 'Ό': 'Ο', 'Ύ': 'Υ', 'Ώ': 'Ω',
+        # With dialytika and tonos
+        'ΐ': 'ι', 'ΰ': 'υ',
+        # With dialytika only
+        'ϊ': 'ι', 'ϋ': 'υ', 'Ϊ': 'Ι', 'Ϋ': 'Υ'
+    }
+
+    result = text
+    for accented, unaccented in accent_map.items():
+        result = result.replace(accented, unaccented)
+
+    return result
+
+
 def progress_bar(progress, total, bar_length=60):
     """Display a more compact progress bar that updates in place
     

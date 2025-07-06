@@ -4,6 +4,7 @@ import re
 import requests
 from dotenv import load_dotenv
 
+
 class UserCredentials:
     def __init__(self):
         # Load credentials from environment variables or prompt user
@@ -12,21 +13,21 @@ class UserCredentials:
         self.username = os.getenv('ECLASS_USERNAME')
         self.password = os.getenv('ECLASS_PASSWORD')
 
-        # Prompt for credentials if not available in environment
+        # Prompt for credentials if not set
         if not self.username:
             # self.username = getpass.getpass(prompt="Username: ")
             self.username = input("Username: ")
         if not self.password:
             self.password = getpass.getpass(prompt="Password: ")
 
-        # Debugging: print credentials (remove in production)
+        # Debugging: print credentials
         # print(self.username)
         # print(self.password)
 
         # Never print credentials
         print("\nCredentials loaded successfully")
 
-        # These should be obtained dynamically rather than hardcoded
+        # Get execution token dynamically
         self.execution = self._get_execution_token()
         self.eventId = "submit"
         self.json_response = self._build_json_endpoint()
@@ -51,7 +52,7 @@ class UserCredentials:
         except Exception as e:
             print(f"Error fetching execution token: {e}")
 
-    def _build_json_endpoint(self, course_code="INF198"):
+    def _build_json_endpoint(self, course_code="INF001"):
         """Build the JSON endpoint URL with the given course code"""
         return f"https://eclass.aueb.gr/modules/user/userslist.php?course={course_code}&sEcho=1&iColumns=2&sColumns=%2C&iDisplayStart=0&iDisplayLength=10&mDataProp_0=0&sSearch_0=&bRegex_0=false&bSearchable_0=true&bSortable_0=true&mDataProp_1=1&sSearch_1=&bRegex_1=false&bSearchable_1=true&bSortable_1=true&sSearch=&bRegex=false&iSortCol_0=0&sSortDir_0=asc&iSortingCols=1&_=1678298218568"
 

@@ -7,9 +7,10 @@ def show_banner():
              / /___/ /___ ___/ / 
             /_____/\____//____/  
                          
-         Made by Thanos-Panagiotidis
+         Made by Thanos Panagiotidis
       thanos.panagiotidis@protonmail.com
     """)
+
 
 def show_search_header():
     print("""
