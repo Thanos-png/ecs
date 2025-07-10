@@ -34,17 +34,25 @@ Your credentials are securely requested on runtime via terminal prompts. No hard
 ```
 ecs --scrape
 ```
-This will log into the system, fetch user data, and save it to ```data/user-ids-{course code}.txt```.
+This will log into the system, fetch user data, and save it to ```data/user-ids-{course code}.txt``` and ```data/students_{course code}.json```.
 
 ### Search by Student ID:
 ```
 ecs --search 1234567
 ```
+You can use either this ```1234567``` or this ```p1234567``` format.
 
 ### Search by Full Name:
 ```
-ecs --name "Αθανάσιος Παναγιωτίδης"
+ecs --name "Παναγιωτίδης Αθανάσιος"
 ```
+The student name has to be in the following format: "LASTNAME FIRSTNAME" or "LASTNAME MIDDLENAME FIRSTNAME" if the student has a middle name.
+
+### Database Information:
+```
+ecs --info
+```
+This shows information about all scraped course databases.
 
 ## Common Errors
 #### Code changes not reflected when testing

@@ -91,7 +91,7 @@ def main():
     parser = argparse.ArgumentParser(description="Scrape AUEB eClass student data.")
     parser.add_argument("--scrape", action="store_true", help="Scrape user data and write to file")
     parser.add_argument("--search", metavar="STUDENT_ID", help="Search by student ID")
-    parser.add_argument("--name", metavar="NAME", help="Search by student name if ID not provided")
+    parser.add_argument("--name", metavar="LASTNAME_FIRSTNAME", help="Search by student name")
     parser.add_argument("--info", action="store_true", help="Show database information")
     args = parser.parse_args()
 

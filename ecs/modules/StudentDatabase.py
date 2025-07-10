@@ -8,11 +8,8 @@ from ecs.modules.Student import Student
 class StudentDatabase:
     def __init__(self, db_file="student_database.json", auto_load=True):
         self.db_file = db_file
-        # For O(log n) search by user_id - sorted list of (user_id, student) tuples
-        self._by_user_id = []
-        # For O(log n) search by name - sorted list of (normalized_name, student) tuples
-        self._by_name = []
-        # For quick lookup without binary search - O(1) average case
+        self._by_user_id = []  # O(1) average case
+        self._by_name = []  # O(1) average case
         self._user_id_dict = {}
         self._name_dict = defaultdict(list)  # Multiple students might have same name
 
